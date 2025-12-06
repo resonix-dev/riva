@@ -1,0 +1,8 @@
+[package]
+name = "riva-test"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+riva = { path = "../", features = ["soundcloud"] }
+tokio = { version = "1", features = ["full"] }
