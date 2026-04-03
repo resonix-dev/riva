@@ -1,102 +1,119 @@
-# Riva
+# riva
 
-Riva is a provider-agnostic media stream metadata extractor written in Rust. It ships with first-class support for SoundCloud and YouTube and exposes ergonomic helpers so you can build downloaders, previewers, or stream routers without babysitting ever-changing web APIs.
+Server-backed Rust client for the Riva media proxy.
+
+By default, this crate targets the riva servers.
+You can override the server with environment variables.
 
 ## Features
 
-- **Provider abstraction** – a single crate that exposes provider-specific modules gated behind feature flags (`soundcloud`, `youtube`).
-- **Async-first API** – powered by `reqwest` and `tokio` so you can integrate into any modern async application.
-- **Strict normalization** – helpers that sanitize user-provided URLs/IDs before the networking layer touches them.
-- **Testing bench** – deterministic unit tests and integration tests located under `tests/` cover URL normalization and extractor helpers.
-- **Example client** – `example/` contains a miniature CLI showing how to list all SoundCloud streams for a track.
+- `youtube` (enabled by default)
+- `soundcloud` (enabled by default)
 
-## Getting Started
+Disable defaults if needed:
 
-### Requirements
-
-- Rust 1.81+ (edition 2024)
-- `cargo` (bundled with Rustup)
-
-### Installation
-
-Add Riva to your project with the providers you need:
-
-```bash
-cargo add riva --features youtube,soundcloud
+```toml
+[dependencies]
+riva = { version = "1", default-features = false, features = ["youtube"] }
 ```
 
-Disable providers you do not plan to use:
+## Environment Variables
 
-```bash
-cargo add riva --no-default-features --features youtube
-```
+Base URL (first non-empty value wins):
 
-### Quick Example
+- `RIVA_BASE_URL`
+- `RIVA_SERVER_URL`
+- `RIVA_URL`
+
+Access secret (optional, first non-empty value wins):
+
+- `RIVA_ACCESS_SECRET`
+- `RIVA_API_KEY`
+- `RIVA_TOKEN`
+
+If an access secret is set, the client sends `Authorization: Bearer <secret>`.
+
+## Quick Start
 
 ```rust
-use riva::soundcloud::{extract_streams, StreamInfo};
+use riva::RivaClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let track_url = "https://soundcloud.com/kordhell/trageluxe";
-    let streams: Vec<StreamInfo> = extract_streams(track_url).await?;
+    let client = RivaClient::from_env()?;
 
-    for stream in streams {
-        println!("{} {}", stream.protocol, stream.mime_type);
-        println!("  URL: {}", stream.url);
+    let health = client.health().await?;
+    println!("{} @ {}", health.status, health.time);
+
+    Ok(())
+}
+```
+
+## YouTube
+
+```rust
+use riva::{RivaClient, YoutubeClientType};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RivaClient::from_env()?;
+
+    let info = client
+        .youtube_info("rkaiKn5iGzc", Some(YoutubeClientType::Web))
+        .await?;
+    println!("video info: {info}");
+
+    let response = client
+        .youtube_stream("rkaiKn5iGzc", 18, Some(YoutubeClientType::Web))
+        .await?;
+
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let bytes = chunk?;
+        println!("received {} bytes", bytes.len());
     }
 
     Ok(())
 }
 ```
 
-An executable example that mirrors this snippet lives in `example/src/main.rs` and can be executed via:
+For `bytes_stream()` consumption, add:
 
-```bash
-cargo run --example riva-test -- https://soundcloud.com/kordhell/trageluxe
+```toml
+futures-util = "0.3"
 ```
 
-## Provider Matrix
+and import:
 
-| Provider    | Feature flag | Normalization helper        | Notes |
-|-------------|--------------|-----------------------------|-------|
-| SoundCloud  | `soundcloud` | `riva::soundcloud::normalize_track_url` | Discovers client IDs automatically and filters unsupported transcodings. |
-| YouTube     | `youtube`    | `riva::youtube::normalize_video_id`     | Uses the lightweight mobile API and filters inaccessible streams. |
-
-## Testing Bench
-
-The repository ships with a deterministic testing bench that avoids hitting live provider APIs:
-
-- `tests/normalization.rs` validates public normalization helpers for both providers.
-- Module-level unit tests check extractor utilities such as SoundCloud transcoding filters and YouTube stream classification helpers.
-
-Run the entire suite locally with:
-
-```bash
-cargo test
+```rust
+use futures_util::StreamExt;
 ```
 
-CI runs `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test` on every pull request to ensure the testing bench stays green.
+## SoundCloud
 
-## Project Structure
+```rust
+use riva::RivaClient;
 
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = RivaClient::from_env()?;
+
+    let response = client
+        .soundcloud_stream("https://soundcloud.com/kordhell/trageluxe")
+        .await?;
+
+    let bytes = response.bytes().await?;
+    println!("downloaded {} bytes", bytes.len());
+
+    Ok(())
+}
 ```
-src/
-  providers/
-    soundcloud/   # SoundCloud extractor, models, and URL normalization
-    youtube/      # YouTube extractor, models, and helpers
-example/
-  src/main.rs    # Minimal binary for manual experiments
-```
 
-## Contributing
+## API
 
-See `CONTRIBUTING.md` for detailed guidelines, coding standards, and the review checklist. By participating you agree to abide by the `CODE_OF_CONDUCT.md`.
-
-## Security
-
-Security disclosures should follow the process documented in `SECURITY.md`. Please avoid filing public issues for vulnerabilities.
-
-## License
-
-Distributed under the terms of the MIT License. See `LICENSE` for details.
+- `RivaClient::from_env()`
+- `RivaClient::new(config)`
+- `RivaClient::health()`
+- `RivaClient::youtube_info(...)` (feature: `youtube`)
+- `RivaClient::youtube_stream(...)` (feature: `youtube`)
+- `RivaClient::soundcloud_stream(...)` (feature: `soundcloud`)

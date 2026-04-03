@@ -1,15 +1,9 @@
-pub mod providers;
+mod client;
+mod config;
+mod error;
 
 #[cfg(feature = "youtube")]
-pub mod youtube {
-    pub use crate::providers::youtube::{
-        RivaError, StreamInfo, extract_streams, normalize_video_id,
-    };
-}
-
-#[cfg(feature = "soundcloud")]
-pub mod soundcloud {
-    pub use crate::providers::soundcloud::{
-        RivaError, StreamInfo, extract_streams, normalize_track_url,
-    };
-}
+pub use client::YoutubeClientType;
+pub use client::{HealthResponse, RivaClient};
+pub use config::{DEFAULT_RIVA_BASE_URL, RivaConfig};
+pub use error::{ApiErrorBody, RivaError};
