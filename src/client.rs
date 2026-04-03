@@ -155,10 +155,10 @@ fn normalize_youtube_id(input: &str) -> Result<String, RivaError> {
         return Ok(raw.to_string());
     }
 
-    if let Some(url) = parse_possible_url(raw) {
-        if let Some(id) = youtube_id_from_url(&url) {
-            return Ok(id);
-        }
+    if let Some(url) = parse_possible_url(raw)
+        && let Some(id) = youtube_id_from_url(&url)
+    {
+        return Ok(id);
     }
 
     let candidate = raw
@@ -195,10 +195,10 @@ fn youtube_id_from_url(url: &Url) -> Option<String> {
         } else {
             None
         }
-    }) {
-        if is_youtube_video_id(&v) {
-            return Some(v);
-        }
+    })
+        && is_youtube_video_id(&v)
+    {
+        return Some(v);
     }
 
     let mut segments = url.path_segments()?;
