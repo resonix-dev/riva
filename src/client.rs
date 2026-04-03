@@ -195,8 +195,7 @@ fn youtube_id_from_url(url: &Url) -> Option<String> {
         } else {
             None
         }
-    })
-        && is_youtube_video_id(&v)
+    }) && is_youtube_video_id(&v)
     {
         return Some(v);
     }
